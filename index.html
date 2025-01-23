@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Parcelas</title>
+    <style>
+        /* Mesma estilização do arquivo original */
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <img src="/static/PRU+.png" alt="Logo 1">
+    </div>
+    <div class="calculator-container">
+        <h1 class="titulo-grande">Calculadora para Parcelamento</h1>
+        <h1 class="titulo-pequeno">Prestações Fixas</h1>
+        <form id="form-calculadora">
+            <label for="valor">Valor a Parcelar:</label>
+            <input type="text" id="valor" required>
+            <label for="parcelas">Número de Parcelas:</label>
+            <input type="text" id="parcelas" required>
+            <button type="button" id="botaoCalcular">Calcular</button>
+            <button type="button" onclick="limparCampos()">Limpar</button>
+        </form>
+        <div id="resultado"></div>
+        <button id="botaoCopiartudo" onclick="copiarResultado('tudo')">Copiar tudo</button>
+        <button id="botaoCopiarvalor" onclick="copiarResultado('valorFormatado')">Copiar valor da parcela</button>
+    </div>
+    <footer>
+        <h1 class="rodape-pequeno"></h1>
+        <img src="/static/COREGEST.png" alt="Logo 2">
+        <img src="/static/DIVPIN.png" alt="Logo 3">
+        <img src="/static/CORAT.png" alt="Logo 4">
+    </footer>
+    <script>
+        async function obterMediaSelicMensal() {
+            const dataAtual = new Date();
+            const dataInicio = new Date();
+            dataInicio.setFullYear(dataAtual.getFullYear() - 1);
+
+            const url = `https://api.bcb.gov.br/dados/serie/bcdata.sgs.4390/dados?formato=json&dataInicial=${dataInicio.toLocaleDateString('pt-BR')}&dataFinal=${dataAtual.toLocaleDateString('pt-BR')}`;
+
+            try {
+                const response = await fetch(url);
+                const dados = await response.json();
+                const valores = dados.map(item => parseFloat(item.valor));
+                const valoresSemUltimo = valores.slice(0, -1);
+                return valoresSemUltimo.reduce((a, b) => a + b, 0) / 1200; // Média mensal
+            } catch (error) {
+                console.error('Erro ao obter taxa SELIC:', error);
+                return null;
+            }
+        }
+
+        async function calcularParcelas() {
+            const valor = parseFloat(document.getElementById('valor').value.replace('.', '').replace(',', '.'));
+            const parcelas = parseInt(document.getElementById('parcelas').value, 10);
+
+            if (isNaN(valor) || isNaN(parcelas)) {
+                alert('Por favor, insira valores válidos.');
+                return;
+            }
+
+            const mediaSelicMensal = await obterMediaSelicMensal();
+            if (!mediaSelicMensal) {
+                alert('Erro ao obter a taxa SELIC. Tente novamente mais tarde.');
+                return;
+            }
+
+            const valorParcela = valor * (1.01 + ((parcelas - 1) / 2) * mediaSelicMensal) / parcelas;
+
+            const textoFinal = `
+                Valor a ser parcelado: R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n
+                Nº de Parcelas: ${parcelas}\n
+                Taxa Média Selic do período: ${(mediaSelicMensal * 100).toFixed(2)}%\n
+                Valor fixo das parcelas: R$ ${valorParcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            `;
+
+            document.getElementById('resultado').innerText = textoFinal;
+            document.getElementById('botaoCopiartudo').style.display = 'block';
+            document.getElementById('botaoCopiarvalor').style.display = 'block';
+            document.getElementById('botaoCopiarvalor').setAttribute('data-valor', valorParcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
+        }
+
+        function copiarResultado(tipo) {
+            const resultado = document.getElementById('resultado');
+            const textarea = document.createElement('textarea');
+
+            if (tipo === 'valorFormatado') {
+                textarea.value = document.getElementById('botaoCopiarvalor').getAttribute('data-valor');
+            } else {
+                textarea.value = resultado.innerText;
+            }
+
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+        }
+
+        function limparCampos() {
+            document.getElementById('form-calculadora').reset();
+            document.getElementById('resultado').innerText = '';
+            document.getElementById('botaoCopiartudo').style.display = 'none';
+            document.getElementById('botaoCopiarvalor').style.display = 'none';
+        }
+
+        document.getElementById('botaoCalcular').addEventListener('click', calcularParcelas);
+    </script>
+</body>
+</html>
